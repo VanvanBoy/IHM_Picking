@@ -182,7 +182,7 @@ class StockApp(tk.Tk):
                     WHERE numero_serie = %s
                 """
                 cursor.execute(query, (numero,))
-                conn.commit()
+                #conn.commit()
                 
                 messagebox.showinfo("Succès", f"La cellule {numero} a été retirée du plateau.")
             except mysql.connector.Error as err:
@@ -237,7 +237,7 @@ class StockApp(tk.Tk):
                     WHERE code_emplacement = %s
                 """
                 cursor.execute(query_update, (numero, nouvel_emplacement))
-                conn.commit()
+                #conn.commit()
                 
                 messagebox.showinfo("Succès", f"La cellule {numero} a été déplacée vers l'emplacement {nouvel_emplacement}.")
             except mysql.connector.Error as err:
@@ -365,7 +365,7 @@ class StockApp(tk.Tk):
                         WHERE code_emplacement = %s
                     """
                     cursor.execute(query_update, (df.loc[idx, "num_serie"], df.loc[idx, "emplacement"]))
-                    conn.commit()
+                    #conn.commit()
 
                 messagebox.showinfo(
                     "Succès", 
@@ -387,13 +387,47 @@ class StockApp(tk.Tk):
     # -------------------------------
     def setup_picking(self, frame):
 
-        # --- Conteneur horizontal pour TreeView + Labels ---
-        container = tk.Frame(frame)
-        container.pack(fill="x", pady=5)
+        # Utilisation de grid pour le découpage horizontal 50/50
+        frame.columnconfigure(0, weight=1)  # 50% pour la colonne de gauche
+        frame.columnconfigure(1, weight=1)  # 50% pour la colonne de droite
+        frame.rowconfigure(0, weight=1)
+
+        # Colonne de gauche
+        left_frame = tk.Frame(frame, bg="lightgray")
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Colonne de droite
+        right_frame = tk.Frame(frame, bg="white")
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+        frame.update_idletasks()
+        largeur_totale = frame.winfo_width() or 800  # Fallback si pas encore affiché
+        largeur_colonne = largeur_totale // 2
+
+        left_frame.config(width=largeur_colonne)
+        right_frame.config(width=largeur_colonne)
+
+        left_frame.grid_propagate(False)
+        right_frame.grid_propagate(False)
+
+        # Création des 2 sous-frames
+        top_frame = tk.Frame(left_frame)
+        bottom_frame = tk.Frame(left_frame)
+
+        # Placement avec grid
+        left_frame.grid_rowconfigure(0, weight=1)   # 20%
+        left_frame.grid_rowconfigure(1, weight=4)   # 80%
+        left_frame.grid_columnconfigure(0, weight=1)
+
+        top_frame.grid(row=0, column=0, sticky="nsew")
+        bottom_frame.grid(row=1, column=0, sticky="nsew")
+
+        self.label_tree1 = tk.Label(right_frame, text="Picking général", font=("Arial", 12))
+        self.label_tree1.pack(pady=5)
 
         # --- TreeView 1 (Liste de toutes les cellules) ---
         self.tree_picking_import = ttk.Treeview(
-            container, 
+            right_frame, 
             columns=("numero_serie", "module", "produit", "etat_picking"), 
             show='headings',
             height=10
@@ -402,108 +436,22 @@ class StockApp(tk.Tk):
         self.tree_picking_import.heading("module", text="Module")
         self.tree_picking_import.heading("produit", text="Produit")
         self.tree_picking_import.heading("etat_picking", text="Etat picking")
-        self.tree_picking_import.pack(side="left", fill="x", expand=True)
+        self.tree_picking_import.pack(side="top", fill="both", expand=True)
 
         self.tree_picking_import.tag_configure("found", background="lightgreen")
         self.tree_picking_import.tag_configure("not_found", background="lightcoral")
 
-        # --- Cadre pour les labels à droite ---
-        label_frame = tk.Frame(container)
-        label_frame.pack(side="right", padx=10)
-
-        self.label_info_1 = tk.Label(label_frame, text="Modèle batterie:", font=("Arial", 12))
-        self.label_info_1.pack(anchor="w", pady=2)
-
-        self.label_info_2 = tk.Label(label_frame, text="Architecture:", font=("Arial", 12))
-        self.label_info_2.pack(anchor="w", pady=2)
-
-        """
-        # --- TreeView 1 (Liste de toutes les cellules) ---
-        self.tree_picking_import = ttk.Treeview(
-            frame, 
-            columns=("numero_serie", "module", "produit", "etat_picking"), 
-            show='headings'
-        )
-        self.tree_picking_import.heading("numero_serie", text="Num Série")
-        self.tree_picking_import.heading("module", text="Module")
-        self.tree_picking_import.heading("produit", text="Produit")
-        self.tree_picking_import.heading("etat_picking", text="Etat picking")
-        self.tree_picking_import.pack(pady=5, fill="x")
-
-        self.tree_picking_import.tag_configure("found", background="lightgreen")
-        self.tree_picking_import.tag_configure("not_found", background="lightcoral")
-        """
         # Boutons (style / couleur modifiée)
-        btn_import = tk.Button(frame, text="Importer fichier de picking", command=self.import_picking,
+        btn_import = tk.Button(right_frame, text="Importer fichier de picking", command=self.import_picking,
                                bg="#6688E7", fg="black")
         btn_import.pack(pady=5)
 
-        btn_launch = tk.Button(frame, text="Lancer le picking", command=self.start_picking,
+        btn_launch = tk.Button(right_frame, text="Lancer le picking", command=self.start_picking,
                                bg="#CD5FE9", fg="black")
         btn_launch.pack(pady=5)
 
-        # --- Sous-frame globale pour partager l'espace en 2 colonnes ---
-        content_frame = tk.Frame(frame)
-        content_frame.pack(fill="both", expand=True)
-
-        # --- Colonne de gauche : picking_frame (invisible au début) ---
-        left_frame = tk.Frame(content_frame)
-        left_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-
-        # Frame pour le picking pas à pas 
-        self.picking_frame = tk.Frame(left_frame)
-        # Police plus grande
-        self.large_font = ("Arial", 14, "bold")
-
-        # Label pour afficher la cellule courante
-        self.label_info_cellule = tk.Label(self.picking_frame, text="Cellule : ", font=self.large_font)
-        self.label_info_cellule.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        # Label pour afficher l'emplacement
-        self.label_info_emplacement = tk.Label(self.picking_frame, text="Emplacement : ", font=self.large_font)
-        self.label_info_emplacement.grid(row=1, column=0, padx=5, pady=5, sticky="w")
-
-        # LED/Statut
-        self.label_status = tk.Label(self.picking_frame, text="Status LED", font=self.large_font)
-        self.label_status.grid(row=0, column=2, rowspan=2, padx=10)
-
-        # Entry pour le scan
-        tk.Label(self.picking_frame, text="Scanner la cellule :", font=("Arial", 12)).grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        self.entry_scan = tk.Entry(self.picking_frame, font=("Arial", 12))
-        self.entry_scan.grid(row=2, column=1, padx=5, pady=5)
-        self.entry_scan.bind("<KeyRelease>", self.check_entry_length)
-
-        # Bouton "Passer la cellule"
-        self.btn_skip = tk.Button(self.picking_frame, text="Passer la cellule", command=self.skip_cellule,
-                                  bg="#6688E7", fg="black", font=("Arial", 12, "bold"))
-        self.btn_skip.grid(row=3, column=0, padx=5, pady=5)
-
-        self.nb_cells_module=0
-        self.current_index = -1
-        self.missed_cells = []
-
-        self.button_retour = tk.Button(
-            self.picking_frame, 
-            text="Retour à la derniere cellule passée", 
-            command=self.return_last_cell, 
-            bg="#CD5FE9", 
-            fg="black",
-            font=("Arial", 12, "bold")
-        )
-        self.button_retour.grid(row=6, column=0, padx=5, pady=5)
-
-        self.option_retour=ttk.Combobox(
-            self.picking_frame, 
-            values=["Batterie","Cellule","Picking"],
-            state="readonly"
-        )
-        self.option_retour.grid(row=5, column=1, padx=5, pady=5)
-
-        tk.Label(self.picking_frame, text="Choisir un mode de retour :", font=("Arial", 12)).grid(row=5, column=0, padx=5, pady=5, sticky="e")
-
-        # --- Colonne de droite : TreeView 2 ---
-        right_frame = tk.Frame(content_frame)
-        right_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
+        self.label_tree2 = tk.Label(right_frame, text="Picking batterie : ", font=("Arial", 12))
+        self.label_tree2.pack(pady=5)
 
         self.tree_picking_module = ttk.Treeview(
             right_frame, 
@@ -515,13 +463,13 @@ class StockApp(tk.Tk):
         self.tree_picking_module.heading("produit", text="Produit")
         self.tree_picking_module.heading("etat picking", text="Etat picking")
         self.tree_picking_module.heading("emplacement", text="Emplacement")
-        
+        """
         self.tree_picking_module.column("numero_serie", width=80)
         self.tree_picking_module.column("module", width=30)
         self.tree_picking_module.column("produit", width=80)
         self.tree_picking_module.column("etat picking", width=40)
         self.tree_picking_module.column("emplacement", width=40)
-
+        """
         scrollbar2 = ttk.Scrollbar(right_frame, orient="vertical", command=self.tree_picking_module.yview)
         self.tree_picking_module.configure(yscrollcommand=scrollbar2.set)
 
@@ -534,6 +482,103 @@ class StockApp(tk.Tk):
         # Dictionnaires pour le mapping {numero_serie -> item_id} dans TreeViews
         self.t1_item_map = {}
         self.t2_item_map = {}
+
+        # Police plus grande
+        self.large_font = ("Arial", 25, "bold")
+
+        # Label pour afficher la cellule courante
+        self.label_info_cellule = tk.Label(top_frame, text="Cellule : ", font=self.large_font)
+        self.label_info_cellule.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        # Label pour afficher l'emplacement
+        self.label_info_emplacement = tk.Label(top_frame, text="Emplacement : ", font=self.large_font)
+        self.label_info_emplacement.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+        # Label pour afficher le module
+
+        self.label_info_module = tk.Label(bottom_frame, text="Module : ", font=("Arial", 12))
+        self.label_info_module.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        #Label qui affiche le nombre de la cellule dans le module
+
+        self.label_info_nb_cell = tk.Label(bottom_frame, text="Cellule : ", font=("Arial", 12))
+        self.label_info_nb_cell.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # LED/Statut
+        self.label_status = tk.Label(bottom_frame, text="Status LED", font=("Arial", 12,"bold"))
+        self.label_status.grid(row=2, column=0, padx=5, pady=5,sticky="w")
+
+        # Entry pour le scan
+        tk.Label(bottom_frame, text="Scanner la cellule :", font=("Arial", 12)).grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.entry_scan = tk.Entry(bottom_frame, font=("Arial", 12))
+        self.entry_scan.grid(row=1, column=1, padx=5, pady=5)
+        self.entry_scan.bind("<KeyRelease>", self.check_entry_length)
+
+        # Bouton "Passer la cellule"
+        self.btn_skip = tk.Button(bottom_frame, text="Passer la cellule", command=self.skip_cellule,
+                                  bg="#6688E7", fg="black", font=("Arial", 12))
+        self.btn_skip.grid(row=3, column=0, padx=5, pady=5)
+
+        self.nb_cells_module=0
+        self.current_index = -1
+        self.missed_cells = []
+
+        self.button_retour = tk.Button(
+            bottom_frame, 
+            text="Retour à la derniere cellule passée", 
+            command=self.return_last_cell, 
+            bg="#CD5FE9", 
+            fg="black",
+            font=("Arial", 12)
+        )
+        self.button_retour.grid(row=5, column=0, padx=5, pady=5)
+
+        self.option_retour=ttk.Combobox(
+            bottom_frame, 
+            values=["Batterie","Cellule","Picking"],
+            state="readonly"
+        )
+        self.option_retour.grid(row=4, column=1, padx=5, pady=5)
+
+        tk.Label(bottom_frame, text="Choisir un mode de retour :", font=("Arial", 12)).grid(row=4, column=0, padx=5, pady=5, sticky="w")
+
+        self.label_info_1 = tk.Label(bottom_frame, text="Modèle batterie:", font=("Arial", 12))
+        self.label_info_1.grid(row=6, column=0, padx=5, pady=5, sticky="w")
+
+        self.label_info_2 = tk.Label(bottom_frame, text="Architecture:", font=("Arial", 12))
+        self.label_info_2.grid(row=6, column=1, padx=5, pady=5, sticky="w")
+
+    def compter_etat_par_batterie(self,batterie_cible):
+        tree=self.tree_picking_module
+        total = 0
+        etat_1 = 0
+
+        for item_id in tree.get_children():
+            values = tree.item(item_id, 'values')
+            num_serie, module, produit, etat,empla = values
+
+            if produit == batterie_cible:
+                total += 1
+                if etat == '1':  # ou `if int(etat) == 1` selon le type
+                    etat_1 += 1
+
+        return total, etat_1
+
+    def compter_etat_par_module(self,module_cible):
+        tree=self.tree_picking_module
+        total = 0
+        etat_1 = 0
+
+        for item_id in tree.get_children():
+            values = tree.item(item_id, 'values')
+            num_serie, module, produit, etat,empla = values
+
+            if int(module) == module_cible:
+                total += 1
+                if etat == '1':  # ou `if int(etat) == 1` selon le type
+                    etat_1 += 1
+
+        return total, etat_1
     
     def return_last_cell(self):
         mode= self.option_retour.get()
@@ -661,7 +706,7 @@ class StockApp(tk.Tk):
         self.missed_cells = []
 
         # On affiche (pack) la picking_frame dans le left_frame
-        self.picking_frame.pack(fill="x", pady=10)
+        #self.picking_frame.grid(row=1, column=0, padx=5, pady=5, sticky="w")
 
         self.load_current_cell()
 
@@ -680,16 +725,38 @@ class StockApp(tk.Tk):
             self.current_index += 1
             self.load_current_cell()
             return
+        
+        self.tree_picking_import.see(self.tree_picking_import.get_children()[self.current_index])
 
         emplacement = self.get_emplacement_from_db(numero_serie)
+        if emplacement:
+            #Rendre l'emplacement plus lisible 
+            parties = emplacement.split('-')
+            if len(parties) > 1:
+                emplacement = f"{parties[0]} - {parties[1]}"
 
         self.label_info_cellule.config(text=f"Cellule : {numero_serie}")
         self.label_info_emplacement.config(text=f"Emplacement : {emplacement if emplacement else '-introuvable-'}")
+        self.label_info_module.config(text=f"Module : {module}")
+
 
         self.entry_scan.delete(0, tk.END)
         self.set_status("Attente scan", "black")
 
         self.refresh_module_tree(module, produit)
+
+        div,num=self.compter_etat_par_module(module)
+        self.label_info_nb_cell.config(text=f"Cellules pickée dans le module : {num}/{div}")
+
+        tot_cell_batterie, tot_cell_picked = self.compter_etat_par_batterie(produit)
+        self.label_tree2.config(text=f"Picking batterie : {produit} ({tot_cell_picked}/{tot_cell_batterie})")
+
+        item_id = self.t2_item_map[numero_serie] if numero_serie in self.t2_item_map else None
+        if item_id:
+            self.tree_picking_module.see(item_id)
+            #self.tree_picking_module.selection_set(item_id)
+        else:
+            messagebox.showwarning("Avertissement", f"Numéro de série {numero_serie} non trouvé dans le module.")
 
     def refresh_module_tree(self, module, produit):
         ancien_emplacements = {}
@@ -841,7 +908,7 @@ class StockApp(tk.Tk):
                     WHERE numero_serie = %s
                 """
                 cursor.execute(query, (numero,))
-                conn.commit()
+                #conn.commit()
             except mysql.connector.Error as err:
                 messagebox.showerror("Erreur DB", f"Erreur lors de la libération : {err}")
             finally:
@@ -856,6 +923,7 @@ class StockApp(tk.Tk):
         if numero_serie in self.t2_item_map:
             item_id = self.t2_item_map[numero_serie]
             self.tree_picking_module.item(item_id, tags=("not_found",))
+            
 
         self.current_index += 1
         self.load_current_cell()

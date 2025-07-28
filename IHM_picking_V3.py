@@ -555,20 +555,32 @@ class StockApp(tk.Tk):
         self.t2_item_map = {}
 
     def get_battery_grid_coords(self, index):
-        nb_batt=index // 70
-        rows = 5
-        col = (index-nb_batt*70) // rows
-        row_in_col = index % rows
+        
+        texte = self.label_info_1.cget("text")  # ex: "Modèle batterie: XYZ123"
+        reference = texte.split(": ", 1)[-1] 
+        
+        if reference =="EMBR036AA":
+            nb_batt=index // 70
+            rows = 5
+            col = (index-nb_batt*70) // rows
+            row_in_col = index % rows
+    
+            # Colonne paire → de bas en haut
+            if col % 2 == 0:
+                row = rows - 1 - row_in_col
+            else:  # Colonne impaire → de haut en bas
+                row = row_in_col
+    
+            return col, row
+        
+        elif reference=="LNBR008AB":
+            nb_batt=index//4 
+            row=0
+            col = index-4*nb_batt
+            return col,row
+            
 
-        # Colonne paire → de bas en haut
-        if col % 2 == 0:
-            row = rows - 1 - row_in_col
-        else:  # Colonne impaire → de haut en bas
-            row = row_in_col
-
-        return col, row
-
-    def create_battery_grid(self):
+    def create_battery_grid_sf(self):
         rows = 5
         columns = 14
         cell_size = 40
@@ -646,7 +658,81 @@ class StockApp(tk.Tk):
         tk.Label(self.battery_grid_frame, text="⬜ cellule non pickée").grid(row=9, column=3, columnspan=3)
         tk.Label(self.battery_grid_frame, text="🟩 cellule pickée", bg="lime green").grid(row=9, column=6, columnspan=3)
         tk.Label(self.battery_grid_frame, text="🟥 cellule non trouvée", bg="red").grid(row=9, column=9, columnspan=3)
+        
+        
+    def create_battery_grid_bodet(self):
+        rows = 1
+        columns = 4
+        cell_size = 40
+        border_colors = ["#E25B5B", "#519AE4"]
+        state_colors = {
+            "none": "white",
+            "picked": "lime green",
+            "missing": "red"
+        }
+        polar = ["+", "-"]
+        cell_states = [["none" for _ in range(rows)] for _ in range(columns)]
 
+        canvases = []
+        indice_polar = 0
+        indice_cell = 0
+        self.battery_cell_states = {}    # (col, row): état ("none", "picked", "missing")
+        self.battery_canvases = {}   # (col, row): canvas
+        
+        j=0
+
+        for i in range(columns):
+            row_canvas = []
+            if i < 2:
+                
+                color = state_colors[cell_states[i][j]]
+                border_color = border_colors[indice_polar]
+                canvas = tk.Canvas(self.battery_grid_frame, width=cell_size, height=cell_size, highlightthickness=0)
+                canvas.grid(row=j+1, column=i, padx=1, pady=1)
+                rect=canvas.create_rectangle(2, 2, cell_size-2, cell_size-2, fill=color, outline=border_color, width=2)
+                canvas.create_text(cell_size//2, cell_size//2, text=polar[indice_polar], font=("Arial", 12))
+                row_canvas.append(canvas)
+
+                self.battery_cell_states[(i, j)] = "none"
+                self.battery_canvases[(i, j)] = (canvas, rect)
+
+                indice_cell += 1
+                indice_polar = 0
+                
+            else:
+                indice_polar=1
+                color = state_colors[cell_states[i][j]]
+                border_color = border_colors[indice_polar]
+                canvas = tk.Canvas(self.battery_grid_frame, width=cell_size, height=cell_size, highlightthickness=0)
+                canvas.grid(row=j+1, column=i, padx=1, pady=1)
+                rect=canvas.create_rectangle(2, 2, cell_size-2, cell_size-2, fill=color, outline=border_color, width=2)
+                canvas.create_text(cell_size//2, cell_size//2, text=polar[indice_polar], font=("Arial", 12))
+                row_canvas.append(canvas)
+
+                self.battery_cell_states[(i, j)] = "none"
+                self.battery_canvases[(i, j)] = (canvas, rect)
+
+                indice_cell += 1
+
+            canvases.append(row_canvas)
+
+        # Titres modules
+        modules = {
+            0: "module 1", 1: "module 2"
+        }
+
+        tk.Label(self.battery_grid_frame, text=modules[0], font=("Arial", 12), bg=border_colors[0]).grid(row=0, column=0, columnspan=2)
+        tk.Label(self.battery_grid_frame, text=modules[1], font=("Arial", 12), bg=border_colors[1]).grid(row=0, column=2, columnspan=2)
+ 
+        
+        tk.Label(self.battery_grid_frame, text="",bg="lightgrey").grid(row=8, column=3, columnspan=2)
+        tk.Label(self.battery_grid_frame, text="",bg="lightgrey").grid(row=8, column=6, columnspan=2)
+        tk.Label(self.battery_grid_frame, text="",bg="lightgrey").grid(row=8, column=9, columnspan=2)
+        
+        tk.Label(self.battery_grid_frame, text="⬜ cellule non pickée").grid(row=9, column=3, columnspan=3)
+        tk.Label(self.battery_grid_frame, text="🟩 cellule pickée", bg="lime green").grid(row=9, column=6, columnspan=3)
+        tk.Label(self.battery_grid_frame, text="🟥 cellule non trouvée", bg="red").grid(row=9, column=9, columnspan=3)
+    
 
     def compter_etat_par_batterie(self,batterie_cible):
         tree=self.tree_picking_module
@@ -792,8 +878,13 @@ class StockApp(tk.Tk):
                         reference_batterie = result[0][0]
                         self.label_info_1.config(text=f"Modèle batterie: {reference_batterie}")
                         self.label_info_2.config(text=f"Architecture: {architecture}")
+                        
                         if reference_batterie == "EMBR036AA":
-                            self.create_battery_grid()
+                            self.create_battery_grid_sf()
+                        if reference_batterie == "LNBR008AB":
+                            self.create_battery_grid_bodet()
+                        
+                        
                 finally:
                     cursor.close()
                     conn.close()
@@ -815,6 +906,7 @@ class StockApp(tk.Tk):
         self.load_current_cell()
 
     def load_current_cell(self):
+        print('passage')
         while self.current_index < len(self.picking_data):
             current_row = self.picking_data[self.current_index]
             numero_serie = current_row.get("Numero_serie_cellule", "")
@@ -924,7 +1016,16 @@ class StockApp(tk.Tk):
         battery_last=self.picking_data[self.current_index-1].get("num_produit_bdd", "")
         if battery_act != battery_last:
             messagebox.showinfo("Fin de picking batterie", f"Fin de picking pour la batterie {battery_last}.")
-            self.create_battery_grid()
+            
+            texte = self.label_info_1.cget("text")  # ex: "Modèle batterie: XYZ123"
+            reference = texte.split(": ", 1)[-1]
+            
+            if reference=="EMBR036AA":
+                self.create_battery_grid_sf()
+            
+            elif reference=="LNBR008AB":
+                self.create_battery_grid_bodet()
+                  
             self.refresh_battery_grid_from_picking()
 
     def check_entry_length(self, event):
@@ -1051,7 +1152,7 @@ class StockApp(tk.Tk):
 
         self.current_index += 1
         self.end_battery()
-        self.load_current_cell()
+        self.after(1000, self.load_current_cell)
 
     def finish_picking(self):
         if self.missed_cells:
